@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Чат</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    #chat { max-width: 800px; margin: 0 auto; padding: 20px; }
+    #messages { list-style-type: none; padding: 0; }
+    #messages li { padding: 8px 10px; background: #f1f1f1; margin-bottom: 10px; border-radius: 5px; }
+    #form { display: flex; }
+    #input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    #send { padding: 10px 20px; border: none; background: #28a745; color: #fff; border-radius: 5px; margin-left: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="chat">
+    <h1>Чат</h1>
+    <p>Вы вошли как <%= username %></p>
+    <div>
+      <label for="room">Выберите комнату:</label>
+      <select id="room">
+        <option value="general">Общий чат</option>
+        <option value="room1">Комната 1</option>
+        <option value="room2">Комната 2</option>
+      </select>
+      <button id="joinRoom">Присоединиться</button>
+    </div>
+    <div>
+      <label for="privateUser">Личное сообщение пользователю:</label>
+      <input type="text" id="privateUser" placeholder="Имя пользователя">
+    </div>
+    <ul id="messages"></ul>
+    <form id="form">
+      <input id="input" autocomplete="off" placeholder="Введите сообщение..." />
+      <button id="send">Отправить</button>
+    </form>
+    <a href="/logout">Выйти</a>
+  </div>
+
+  <!-- Подключение Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+    const roomSelect = document.getElementById('room');
+    const joinRoomButton = document.getElementById('joinRoom');
+    const privateUserInput = document.getElementById('privateUser');
+
+    let currentRoom = 'general';
+
+    socket.emit('join room', currentRoom);
+
+    joinRoomButton.addEventListener('click', () => {
+      const newRoom = roomSelect.value;
+      socket.emit('join room', newRoom);
+      currentRoom = newRoom;
+      messages.innerHTML = ''; // Очистить сообщения при смене комнаты
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const privateUser = privateUserInput.value.trim();
+      if (input.value) {
+        if (privateUser) {
+          // Отправка личного сообщения
+          socket.emit('private message', { to: privateUser, message: input.value });
+        } else {
+          // Отправка сообщения в комнату
+          socket.emit('chat message', { room: currentRoom, message: input.value });
+        }
+        input.value = '';
+      }
+    });
+
+    socket.on('chat message', (data) => {
+      if (data.room === currentRoom) {
+        const item = document.createElement('li');
+        item.textContent = data.message;
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+    });
+
+    socket.on('private message', (data) => {
+      const item = document.createElement('li');
+      item.textContent = `[ЛС от ${data.from}]: ${data.message}`;
+      messages.appendChild(item);
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    socket.on('previous messages', (messagesData) => {
+      messages.innerHTML = '';
+      messagesData.forEach((msg) => {
+        const item = document.createElement('li');
+        item.textContent = msg;
+        messages.appendChild(item);
+      });
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+  </script>
+</body>
+</html>
